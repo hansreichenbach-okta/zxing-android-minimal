@@ -21,3 +21,17 @@ dependencies {
     // Optional dependency.
     provided 'com.android.support:support-v4:21.0.0'
 }
+
+
+uploadArchives {
+    repositories {
+        flatDir {
+            dirs '../repos/integration'
+        }
+    }
+
+    /*repositories.mavenDeployer {
+        repository(url: "file:mvn-clone/maven-repository/")
+        pom.artifactId = 'zxing-android-integration'
+    }*/
+}
