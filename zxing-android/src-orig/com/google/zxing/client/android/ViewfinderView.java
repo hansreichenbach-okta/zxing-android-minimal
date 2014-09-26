@@ -186,7 +186,7 @@ public final class ViewfinderView extends View {
 
     public void addPossibleResultPoint(ResultPoint point) {
         List<ResultPoint> points = possibleResultPoints;
-
+        
         synchronized (possibleResultPoints) {
             points.add(point);
             int size = points.size();
