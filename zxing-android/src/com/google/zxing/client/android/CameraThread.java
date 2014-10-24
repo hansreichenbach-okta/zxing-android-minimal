@@ -77,8 +77,12 @@ public class CameraThread extends HandlerThread {
                 }
 
                 //TODO this is executing on the camera thread and not the UI thread, need to use a handler or something to get it onto the UI thread
-                notifyCameraOpened(camera, holder);
-
+                manager.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        notifyCameraOpened(camera, holder);
+                    }
+                });
             }
         });
     }
@@ -102,7 +106,12 @@ public class CameraThread extends HandlerThread {
                     }
 
                     //TODO this is running on the camera thread not the UI thread, need to fix that
-                    notifyCameraClosed();
+                    manager.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            notifyCameraClosed();
+                        }
+                    });
                 }
             });
 
