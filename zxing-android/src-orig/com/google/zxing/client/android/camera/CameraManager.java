@@ -24,6 +24,7 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import com.google.zxing.PlanarYUVLuminanceSource;
@@ -67,6 +68,7 @@ public final class CameraManager {
     private Point mPreviewFrameSize;
     private int mCurrentOrientation;
     private CameraThread t_camera;
+    private Handler mHandler;
 
     private static final Set<Integer> ORIENTATION_SUPPORT_LIST;
     static {
@@ -90,6 +92,12 @@ public final class CameraManager {
 
         //keep any custom ui options
         scannerOptions = options;
+
+        mHandler = new Handler(Looper.getMainLooper());
+    }
+
+    public void runOnUiThread(Runnable run) {
+        mHandler.post(run);
     }
 
     /**
