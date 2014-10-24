@@ -25,6 +25,7 @@ import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
 
+import com.google.zxing.client.android.CameraThread;
 import com.google.zxing.client.android.PreferencesActivity;
 
 /**
@@ -120,23 +121,20 @@ final class CameraConfigurationManager {
     return screenResolution;
   }
 
-  boolean getTorchState(Camera camera) {
-    if (camera != null) {
-      Camera.Parameters parameters = camera.getParameters();
-      if (parameters != null) {
-        String flashMode = camera.getParameters().getFlashMode();
-        return flashMode != null &&
-            (Camera.Parameters.FLASH_MODE_ON.equals(flashMode) ||
-             Camera.Parameters.FLASH_MODE_TORCH.equals(flashMode));
-      }
+  boolean getTorchState(Camera.Parameters parameters) {
+    if (parameters != null) {
+      String flashMode = parameters.getFlashMode();
+      return flashMode != null &&
+          (Camera.Parameters.FLASH_MODE_ON.equals(flashMode) ||
+           Camera.Parameters.FLASH_MODE_TORCH.equals(flashMode));
     }
     return false;
   }
 
-  void setTorch(Camera camera, boolean newSetting) {
-    Camera.Parameters parameters = camera.getParameters();
+  void setTorch(CameraThread camera, boolean newSetting) {
+    Camera.Parameters parameters = camera.getCameraParameters();
     doSetTorch(parameters, newSetting, false);
-    camera.setParameters(parameters);
+    camera.setCameraParameters(parameters);
   }
 
   private void initializeTorch(Camera.Parameters parameters, SharedPreferences prefs, boolean safeMode) {

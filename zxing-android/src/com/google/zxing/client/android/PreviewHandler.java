@@ -75,6 +75,7 @@ public class PreviewHandler implements SurfaceHolder.Callback {
         cameraManager.setPreviewFrameSize(width, height);
 
         //double check the preview frame size
+        //TODO use scanner options instead of intent bundle
         Intent intent = context.getIntent();
         if (intent.hasExtra(Intents.Scan.WIDTH) && intent.hasExtra(Intents.Scan.HEIGHT)) {
             int frameWidth = intent.getIntExtra(Intents.Scan.WIDTH, 0);
@@ -152,24 +153,12 @@ public class PreviewHandler implements SurfaceHolder.Callback {
                                 characterSet, cameraManager));
             }
             context.decodeOrStoreSavedBitmap(null, null);
-        } catch (IOException ioe) {
-            Log.w(TAG, ioe);
-            displayFrameworkBugMessageAndExit();
         } catch (RuntimeException e) {
             // Barcode Scanner has seen crashes in the wild of this variety:
             // java.?lang.?RuntimeException: Fail to connect to camera service
             Log.w(TAG, "Unexpected error initializing camera", e);
-            displayFrameworkBugMessageAndExit();
+            cameraManager.displayFrameworkBugMessageAndExit();
         }
-    }
-
-    private void displayFrameworkBugMessageAndExit() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        builder.setTitle(context.getString(R.string.zxing_app_name));
-        builder.setMessage(context.getString(R.string.zxing_msg_camera_framework_bug));
-        builder.setPositiveButton(R.string.zxing_button_ok, new FinishListener(context));
-        builder.setOnCancelListener(new FinishListener(context));
-        builder.show();
     }
 
     public void setDecodeHints(Map<DecodeHintType,?> hints) {
