@@ -154,7 +154,7 @@ public final class CaptureActivity extends Activity {
         // want to open the camera driver and measure the screen size if we're going to show the help on
         // first launch. That led to bugs where the scanning rectangle was the wrong size and partially
         // off screen.
-        cameraManager = new CameraManager(getApplication(), options);
+        cameraManager = new CameraManager(this, options);
 
         previewHandler = new PreviewHandler(this, cameraManager);
 
@@ -171,6 +171,7 @@ public final class CaptureActivity extends Activity {
 
         resetStatusView();
 
+        //TODO this initializes the camera. need to refactor this and make it happen on a separate thread so it doesn't block bootup
         previewHandler.setPreviewCallbacks();
 
         if(beepManager != null) {

@@ -29,7 +29,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 import com.google.zxing.client.android.PreferencesActivity;
 
-final class AutoFocusManager implements Camera.AutoFocusCallback {
+public final class AutoFocusManager implements Camera.AutoFocusCallback {
 
   private static final String TAG = AutoFocusManager.class.getSimpleName();
 
@@ -47,7 +47,7 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
   private final Camera camera;
   private AsyncTask<?,?,?> outstandingTask;
 
-  AutoFocusManager(Context context, Camera camera) {
+  public AutoFocusManager(Context context, Camera camera) {
     this.camera = camera;
     SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
     String currentFocusMode = camera.getParameters().getFocusMode();
@@ -76,7 +76,7 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
     }
   }
 
-  synchronized void start() {
+  public synchronized void start() {
     if (useAutoFocus) {
       outstandingTask = null;
       if (!stopped && !focusing) {
@@ -102,7 +102,7 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
     }
   }
 
-  synchronized void stop() {
+  public synchronized void stop() {
     stopped = true;
     if (useAutoFocus) {
       cancelOutstandingTask();

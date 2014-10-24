@@ -16,6 +16,8 @@
 
 package com.google.zxing.client.android.camera;
 
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Point;
@@ -25,8 +27,10 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import com.google.zxing.PlanarYUVLuminanceSource;
+import com.google.zxing.client.android.CameraThread;
+import com.google.zxing.client.android.FinishListener;
+import com.google.zxing.client.android.R;
 import com.google.zxing.client.android.ScannerOptions;
-import com.google.zxing.client.android.camera.open.OpenCameraInterface;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -39,6 +43,7 @@ import java.util.Set;
  * both preview and decoding.
  *
  * @author dswitkin@google.com (Daniel Switkin)
+ * @author hans.reichenbach@okta.com modifications on 10/23/14
  */
 public final class CameraManager {
     //todo check into pulling some out into their own classes?
@@ -49,10 +54,8 @@ public final class CameraManager {
     private static final int MAX_FRAME_WIDTH = 1200; // = 5/8 * 1920
     private static final int MAX_FRAME_HEIGHT = 675; // = 5/8 * 1080
 
-    private final Context context;
+    private final Activity context;
     private final CameraConfigurationManager configManager;
-    private Camera camera;
-    private AutoFocusManager autoFocusManager;
     private Rect framingRect;
     private Rect framingRectInPreview;
     private boolean initialized;
@@ -63,6 +66,7 @@ public final class CameraManager {
     private ScannerOptions scannerOptions;
     private Point mPreviewFrameSize;
     private int mCurrentOrientation;
+    private CameraThread t_camera;
 
     private static final Set<Integer> ORIENTATION_SUPPORT_LIST;
     static {
@@ -79,7 +83,7 @@ public final class CameraManager {
      */
     private final PreviewCallback previewCallback;
 
-    public CameraManager(Context context, ScannerOptions options) {
+    public CameraManager(Activity context, ScannerOptions options) {
         this.context = context;
         this.configManager = new CameraConfigurationManager(context);
         previewCallback = new PreviewCallback(configManager);
@@ -92,28 +96,40 @@ public final class CameraManager {
      * Opens the camera driver and initializes the hardware parameters.
      *
      * @param holder The surface object which the camera will draw preview frames into.
-     * @throws IOException Indicates the camera driver failed to open.
      */
-    public synchronized void openDriver(SurfaceHolder holder) throws IOException {
-        Camera theCamera = camera;
-        if (theCamera == null) {
+    public synchronized void openDriver(SurfaceHolder holder) {
+        if (t_camera == null) {
 
-            if (requestedCameraId >= 0) {
-                theCamera = OpenCameraInterface.open(requestedCameraId);
-            } else {
-                theCamera = OpenCameraInterface.open();
-            }
-
-            if (theCamera == null) {
-                throw new IOException();
-            }
-            camera = theCamera;
+            t_camera = new CameraThread(this, context);
+            t_camera.openCamera(requestedCameraId, holder);
+        } else if(t_camera.isCameraOpen()) {
+            t_camera.openCamera(requestedCameraId, holder);
         }
-        theCamera.setPreviewDisplay(holder);
+    }
+
+    /**
+     * Callback method for the camera thread to call when it's done opening the camera.
+     *
+     * @param camera The camera that was opened or null if failed.
+     */
+    public synchronized void onCameraOpened(Camera camera, SurfaceHolder holder) {
+        //make sure we got a camera back
+        if(camera == null) {
+            displayFrameworkBugMessageAndExit();
+            return;
+        }
+
+        try {
+            camera.setPreviewDisplay(holder);
+        } catch (IOException ioe) {
+            Log.w(TAG, ioe);
+            displayFrameworkBugMessageAndExit();
+            return;
+        }
 
         if (!initialized) {
             initialized = true;
-            configManager.initFromCameraParameters(theCamera);
+            configManager.initFromCameraParameters(camera);
             if (requestedFramingRectWidth > 0 && requestedFramingRectHeight > 0) {
                 setManualFramingRect(requestedFramingRectWidth, requestedFramingRectHeight);
                 requestedFramingRectWidth = 0;
@@ -121,41 +137,40 @@ public final class CameraManager {
             }
         }
 
-        Camera.Parameters parameters = theCamera.getParameters();
+        Camera.Parameters parameters = camera.getParameters();
         String parametersFlattened = parameters == null ? null : parameters.flatten(); // Save these, temporarily
         try {
-            configManager.setDesiredCameraParameters(theCamera, false);
+            configManager.setDesiredCameraParameters(camera, false);
         } catch (RuntimeException re) {
             // Driver failed
             Log.w(TAG, "Camera rejected parameters. Setting only minimal safe-mode parameters");
             Log.i(TAG, "Resetting to saved camera params: " + parametersFlattened);
             // Reset:
             if (parametersFlattened != null) {
-                parameters = theCamera.getParameters();
+                parameters = camera.getParameters();
                 parameters.unflatten(parametersFlattened);
                 try {
-                    theCamera.setParameters(parameters);
-                    configManager.setDesiredCameraParameters(theCamera, true);
+                    camera.setParameters(parameters);
+                    configManager.setDesiredCameraParameters(camera, true);
                 } catch (RuntimeException re2) {
                     // Well, darn. Give up
                     Log.w(TAG, "Camera rejected even safe-mode parameters! No configuration");
                 }
             }
         }
-
     }
 
     public synchronized boolean isOpen() {
-        return camera != null;
+        return t_camera != null && t_camera.isCameraOpen();
     }
 
     /**
      * Closes the camera driver if still in use.
      */
     public synchronized void closeDriver() {
-        if (camera != null) {
-            camera.release();
-            camera = null;
+        if (isOpen()) {
+            t_camera.closeCamera();
+
             // Make sure to clear these each time we close the camera, so that any scanning rect
             // requested by intent is forgotten.
             framingRect = null;
@@ -165,9 +180,8 @@ public final class CameraManager {
 
     public synchronized void startPreview(SurfaceHolder holder) {
         try {
-            if (camera != null && !isPreviewRunning()) {
-                camera.setPreviewDisplay(holder);
-                startPreview();
+            if (isOpen() && !isPreviewRunning()) {
+                t_camera.startPreview(holder);
             }
         } catch(IOException e) {
             Log.e(TAG, e.getMessage());
@@ -181,11 +195,9 @@ public final class CameraManager {
     public synchronized void startPreview() {
         Log.d(TAG, "starting camera preview");
 
-        Camera theCamera = camera;
-        if (theCamera != null && !isPreviewRunning()) {
-            theCamera.startPreview();
+        if (isOpen() && !isPreviewRunning()) {
+            t_camera.startPreview();
             previewing = true;
-            autoFocusManager = new AutoFocusManager(context, camera);
         }
     }
 
@@ -194,12 +206,9 @@ public final class CameraManager {
      */
     public synchronized void stopPreview() {
         Log.d(TAG, "stopping camera preview");
-        if (autoFocusManager != null) {
-            autoFocusManager.stop();
-            autoFocusManager = null;
-        }
-        if (camera != null && isPreviewRunning()) {
-            camera.stopPreview();
+
+        if (isOpen() && isPreviewRunning()) {
+            t_camera.stopPreview();
             previewCallback.setHandler(null, 0);
             previewing = false;
         }
@@ -218,8 +227,8 @@ public final class CameraManager {
      * @return the current camera parameters or null if no camera found
      */
     public synchronized Camera.Parameters getCameraParameters() {
-        if(camera != null) {
-            return camera.getParameters();
+        if(isOpen()) {
+            return t_camera.getCameraParameters();
         } else {
             return null;
         }
@@ -231,8 +240,8 @@ public final class CameraManager {
      * @param params the new camera parameters to set
      */
     public synchronized void setCameraParameters(Camera.Parameters params) {
-        if(camera != null && !isPreviewRunning()) {
-            camera.setParameters(params);
+        if(isOpen() && !isPreviewRunning()) {
+            t_camera.setCameraParameters(params);
         } else {
             Log.w(TAG, "tried to set parameters when the camera was unavailable");
         }
@@ -243,8 +252,8 @@ public final class CameraManager {
      * @param orientation the orientation in degrees ot rotate the camera display
      */
     public synchronized  void setCameraOrientation(int orientation) {
-        if(camera != null) {
-            camera.setDisplayOrientation(orientation);
+        if(isOpen()) {
+            t_camera.setDisplayOrientation(orientation);
         }
     }
 
@@ -254,15 +263,12 @@ public final class CameraManager {
      * @param newSetting if {@code true}, light should be turned on if currently off. And vice versa.
      */
     public synchronized void setTorch(boolean newSetting) {
-        if (newSetting != configManager.getTorchState(camera)) {
-            if (camera != null) {
-                if (autoFocusManager != null) {
-                    autoFocusManager.stop();
-                }
-                configManager.setTorch(camera, newSetting);
-                if (autoFocusManager != null) {
-                    autoFocusManager.start();
-                }
+        Camera.Parameters parameters = t_camera.getCameraParameters();
+        if (newSetting != configManager.getTorchState(parameters)) {
+            if (t_camera.isCameraOpen()) {
+                t_camera.stopAutoFocus();
+                configManager.setTorch(t_camera, newSetting);
+                t_camera.startAutoFocus();
             }
         }
     }
@@ -276,10 +282,9 @@ public final class CameraManager {
      * @param message The what field of the message to be sent.
      */
     public synchronized void requestPreviewFrame(Handler handler, int message) {
-        Camera theCamera = camera;
-        if (theCamera != null && previewing) {
+        if (isOpen() && isPreviewRunning()) {
             previewCallback.setHandler(handler, message);
-            theCamera.setOneShotPreviewCallback(previewCallback);
+            t_camera.setOneShotPreviewCallback(previewCallback);
         }
     }
 
@@ -292,7 +297,7 @@ public final class CameraManager {
      */
     public synchronized Rect getFramingRect() {
         if (framingRect == null) {
-            if (camera == null) {
+            if (isOpen()) {
                 return null;
             }
             Camera.Size previewResolution = getPreviewSize();
@@ -490,6 +495,15 @@ public final class CameraManager {
 
     public int getOverlayOpacity() {
         return scannerOptions.getOverlayOpacity();
+    }
+
+    public void displayFrameworkBugMessageAndExit() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(context.getString(R.string.zxing_app_name));
+        builder.setMessage(context.getString(R.string.zxing_msg_camera_framework_bug));
+        builder.setPositiveButton(R.string.zxing_button_ok, new FinishListener(context));
+        builder.setOnCancelListener(new FinishListener(context));
+        builder.show();
     }
 
 }
