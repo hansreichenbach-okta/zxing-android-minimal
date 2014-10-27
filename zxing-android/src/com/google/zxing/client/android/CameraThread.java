@@ -25,6 +25,7 @@ public class CameraThread extends HandlerThread {
     private Handler mHandler;
     private Camera camera;
     private final Object cameraMutex;
+    private final Object waitLock;
     private boolean isCameraOpen;
     private boolean pendingCameraOpen;
     private CameraManager manager;
@@ -40,7 +41,16 @@ public class CameraThread extends HandlerThread {
         pendingCameraOpen = false;
         manager = parent;
         cameraMutex = new Object();
+        waitLock = new Object();
         this.context = context;
+
+        //TODO simple test
+        manager.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Log.v(TAG, "this was run using the runOnUiThread method");
+            }
+        });
     }
 
     public boolean isCameraOpen() {
@@ -55,7 +65,10 @@ public class CameraThread extends HandlerThread {
 
     private void notifyCameraClosed() {
         isCameraOpen = false;
-        notify();
+        synchronized (waitLock) {
+            waitLock.notify();
+        }
+        Log.d(TAG, "ui thread notified of camera closed");
     }
 
     public synchronized void openCamera(final int requestedCamera, final SurfaceHolder holder) {
@@ -66,6 +79,14 @@ public class CameraThread extends HandlerThread {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                //TODO simple test
+                manager.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.v(TAG, "this was run using the runOnUiThread method from the camera thread");
+                    }
+                });
+
                 synchronized (cameraMutex) {
                     Log.i(TAG, "opening camera");
 
@@ -76,7 +97,8 @@ public class CameraThread extends HandlerThread {
                     }
                 }
 
-                //TODO this is executing on the camera thread and not the UI thread, need to use a handler or something to get it onto the UI thread
+                Log.i(TAG, "finished opening camera");
+
                 manager.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -87,7 +109,7 @@ public class CameraThread extends HandlerThread {
         });
     }
 
-    public synchronized void closeCamera() {
+    public void closeCamera() {
         Log.d(TAG, "close camera called");
 
         //should be able to just post this if it's pending and it'll execute after open finishes
@@ -105,7 +127,6 @@ public class CameraThread extends HandlerThread {
                         isCameraOpen = false;
                     }
 
-                    //TODO this is running on the camera thread not the UI thread, need to fix that
                     manager.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -116,7 +137,11 @@ public class CameraThread extends HandlerThread {
             });
 
             try {
-                wait();
+                Log.v(TAG, "waiting on camera to close....");
+                synchronized(waitLock) {
+                    waitLock.wait();
+                }
+                Log.v(TAG, "done waiting on camera to close...");
             } catch (InterruptedException e) {
                 Log.e(TAG, "Error while waiting for camera to close");
                 throw new RuntimeException();
