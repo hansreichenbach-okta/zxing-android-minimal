@@ -93,7 +93,7 @@ public final class CameraManager {
         //keep any custom ui options
         scannerOptions = options;
 
-        mHandler = new Handler(Looper.getMainLooper());
+        mHandler = new Handler(context.getMainLooper());
     }
 
     public void runOnUiThread(Runnable run) {
@@ -121,6 +121,8 @@ public final class CameraManager {
      * @param camera The camera that was opened or null if failed.
      */
     public synchronized void onCameraOpened(Camera camera, SurfaceHolder holder) {
+        Log.v(TAG, "camera opened callback received");
+
         //make sure we got a camera back
         if(camera == null) {
             displayFrameworkBugMessageAndExit();
@@ -178,6 +180,8 @@ public final class CameraManager {
     public synchronized void closeDriver() {
         if (isOpen()) {
             t_camera.closeCamera();
+            t_camera.quit();
+            t_camera = null;
 
             // Make sure to clear these each time we close the camera, so that any scanning rect
             // requested by intent is forgotten.

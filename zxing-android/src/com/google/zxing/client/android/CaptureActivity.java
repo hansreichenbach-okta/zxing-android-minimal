@@ -171,7 +171,7 @@ public final class CaptureActivity extends Activity {
 
         resetStatusView();
 
-        //TODO this initializes the camera. need to refactor this and make it happen on a separate thread so it doesn't block bootup
+        //TODO this initializes the camera. shouldn't block bootup anymore since camera is on its own thread
         previewHandler.setPreviewCallbacks();
 
         if(beepManager != null) {
