@@ -89,6 +89,7 @@ public class PreviewHandler implements SurfaceHolder.Callback {
   }
 
   public void setPreviewCallbacks() {
+      Log.i(TAG, "setting preview callbacks");
     try {
       QRScannerView qrPreview = (QRScannerView) context.findViewById(R.id.zxing_preview_view);
       SurfaceHolder surfaceHolder = qrPreview.getHolder();
@@ -143,6 +144,9 @@ public class PreviewHandler implements SurfaceHolder.Callback {
       Log.w(TAG, "initCamera() while already open -- late SurfaceView callback?");
       return;
     }
+
+      Log.v(TAG, "initializing camera");
+
     try {
       cameraManager.openDriver(surfaceHolder);
       // Creating the handler starts the preview, which can also throw a RuntimeException.
