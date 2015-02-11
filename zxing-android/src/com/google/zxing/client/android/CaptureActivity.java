@@ -61,7 +61,7 @@ public final class CaptureActivity extends Activity {
 
     private static final long DEFAULT_INTENT_RESULT_DURATION_MS = 1500L;
     private static final long BULK_MODE_SCAN_DELAY_MS = 1000L;
-    private static final int RESULT_BACK_BUTTON = 1885;
+    private static final int RESULT_ZXING_BACK_BUTTON = 1885;
 
     private static final String[] ZXING_URLS = { "http://zxing.appspot.com/scan", "zxing://scan/" };
 
@@ -139,7 +139,7 @@ public final class CaptureActivity extends Activity {
             cancelButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    setResult(RESULT_BACK_BUTTON);
+                    setResult(RESULT_ZXING_BACK_BUTTON);
                     finish();
                 }
             });
