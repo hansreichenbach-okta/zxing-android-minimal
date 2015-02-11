@@ -123,6 +123,7 @@ public class IntentIntegrator {
 
     public static final String LAYOUT_PORTRAIT = "PORTRAIT";
     public static final String LAYOUT_LANDSCAPE = "LANDSCAPE";
+    public static final int RESULT_BACK_BUTTON = 1885;
 
     public static final Collection<String> ALL_CODE_TYPES = null;
 
