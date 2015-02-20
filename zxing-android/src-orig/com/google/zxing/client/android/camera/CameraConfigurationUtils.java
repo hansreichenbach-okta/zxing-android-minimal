@@ -42,6 +42,8 @@ public final class CameraConfigurationUtils {
 
   private static final Pattern SEMICOLON = Pattern.compile(";");
 
+  //TODO make min preview resolution and max aspect distortion customizable
+
   private static final int MIN_PREVIEW_PIXELS = 480 * 320; // normal screen
   private static final float MAX_EXPOSURE_COMPENSATION = 1.5f;
   private static final float MIN_EXPOSURE_COMPENSATION = 0.0f;
@@ -129,7 +131,7 @@ public final class CameraConfigurationUtils {
         parameters.setExposureCompensation(compensationSteps);
       }
     } else {
-      Log.i(TAG, "Camera does not support exposure compensation");
+      Log.w(TAG, "Camera does not support exposure compensation");
     }
   }
 
@@ -173,7 +175,7 @@ public final class CameraConfigurationUtils {
       Log.i(TAG, "Setting focus area to : " + toString(middleArea));
       parameters.setFocusAreas(middleArea);
     } else {
-      Log.i(TAG, "Device does not support focus areas");
+      Log.w(TAG, "Device does not support focus areas");
     }
   }
 
@@ -184,7 +186,7 @@ public final class CameraConfigurationUtils {
       Log.i(TAG, "Setting metering area to : " + toString(middleArea));
       parameters.setMeteringAreas(middleArea);
     } else {
-      Log.i(TAG, "Device does not support metering areas");
+      Log.w(TAG, "Device does not support metering areas");
     }
   }
 
@@ -202,7 +204,7 @@ public final class CameraConfigurationUtils {
         parameters.setVideoStabilization(true);
       }
     } else {
-      Log.i(TAG, "This device does not support video stabilization");
+      Log.w(TAG, "This device does not support video stabilization");
     }
   }
 
@@ -310,7 +312,15 @@ public final class CameraConfigurationUtils {
       Log.i(TAG, "Supported preview sizes: " + previewSizesString);
     }
 
-    double screenAspectRatio = (double) screenResolution.x / (double) screenResolution.y;
+    //camera resolutions are always landscape, so flip the screen aspect ratio to match the landscape ratio
+    double screenAspectRatio;
+    if(screenResolution.x < screenResolution.y) {
+      //screen is portrait mode
+      screenAspectRatio = (double) screenResolution.y / (double) screenResolution.x;
+    } else {
+      //screen is landscape mode
+      screenAspectRatio = (double) screenResolution.x / (double) screenResolution.y;
+    }
 
     // Remove sizes that are unsuitable
     Iterator<Camera.Size> it = supportedPreviewSizes.iterator();
@@ -327,15 +337,17 @@ public final class CameraConfigurationUtils {
       int maybeFlippedWidth = isCandidatePortrait ? realHeight : realWidth;
       int maybeFlippedHeight = isCandidatePortrait ? realWidth : realHeight;
       double aspectRatio = (double) maybeFlippedWidth / (double) maybeFlippedHeight;
+
       double distortion = Math.abs(aspectRatio - screenAspectRatio);
       if (distortion > MAX_ASPECT_DISTORTION) {
+        Log.w(TAG, "removed resolution " + realWidth + "x" + realHeight +
+            " because had aspect distortion of " + distortion);
         it.remove();
         continue;
       }
 
       if (maybeFlippedWidth == screenResolution.x && maybeFlippedHeight == screenResolution.y) {
         Point exactPoint = new Point(realWidth, realHeight);
-        Log.i(TAG, "Found preview size exactly matching screen size: " + exactPoint);
         return exactPoint;
       }
     }
@@ -346,7 +358,6 @@ public final class CameraConfigurationUtils {
     if (!supportedPreviewSizes.isEmpty()) {
       Camera.Size largestPreview = supportedPreviewSizes.get(0);
       Point largestSize = new Point(largestPreview.width, largestPreview.height);
-      Log.i(TAG, "Using largest suitable preview size: " + largestSize);
       return largestSize;
     }
 
@@ -356,15 +367,13 @@ public final class CameraConfigurationUtils {
       throw new IllegalStateException("Parameters contained no preview size!");
     }
     Point defaultSize = new Point(defaultPreview.width, defaultPreview.height);
-    Log.i(TAG, "No suitable preview sizes, using default: " + defaultSize);
+    Log.w(TAG, "No suitable preview sizes, using default: " + defaultSize);
     return defaultSize;
   }
 
   private static String findSettableValue(String name,
                                           Collection<String> supportedValues,
                                           String... desiredValues) {
-    Log.i(TAG, "Requesting " + name + " value from among: " + Arrays.toString(desiredValues));
-    Log.i(TAG, "Supported " + name + " values: " + supportedValues);
     if (supportedValues != null) {
       for (String desiredValue : desiredValues) {
         if (supportedValues.contains(desiredValue)) {
@@ -373,7 +382,8 @@ public final class CameraConfigurationUtils {
         }
       }
     }
-    Log.i(TAG, "No supported values match");
+    Log.i(TAG, "For " + name + " no supported values of " + Arrays.toString(desiredValues) +
+        " match " + supportedValues);
     return null;
   }
 
