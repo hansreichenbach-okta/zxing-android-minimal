@@ -222,9 +222,11 @@ public final class CameraManager {
     }
 
     public synchronized Camera.CameraInfo getCameraInfo() {
-        if(camera != null && requestedCameraId >= 0) {
+        int cameraId = getCameraId();
+
+        if(camera != null && cameraId >= 0) {
             Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
-            Camera.getCameraInfo(requestedCameraId, cameraInfo);
+            Camera.getCameraInfo(cameraId, cameraInfo);
             return cameraInfo;
         }
 
