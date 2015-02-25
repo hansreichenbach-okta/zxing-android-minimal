@@ -3,6 +3,7 @@ package com.google.zxing.client.android;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.hardware.Camera;
 import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
@@ -64,13 +65,38 @@ public class PreviewHandler implements SurfaceHolder.Callback {
         }
 
         Display display = ((WindowManager)context.getSystemService(Activity.WINDOW_SERVICE)).getDefaultDisplay();
-
-        if(display.getRotation() == Surface.ROTATION_0) {
-            //source code has (height, width) when changing previewSize
-            cameraManager.setCameraOrientation(90);
-        } else if(display.getRotation() == Surface.ROTATION_270) {
-            cameraManager.setCameraOrientation(180);
+        Camera.CameraInfo cameraInfo = cameraManager.getCameraInfo();
+        int cameraRotationOffset;
+        if(cameraInfo != null) {
+            cameraRotationOffset = cameraInfo.orientation;
+        } else {
+            Log.w(TAG, "Using default camera rotation offset instead of camera orientation because camera info was null");
+            cameraRotationOffset = 90; //not sure why this is 90, but that's what seems to work.
         }
+
+        int rotation = display.getRotation();
+        int degrees;
+        switch (rotation) {
+            case Surface.ROTATION_0:
+            default:
+                degrees = 0;
+                break; // Natural orientation
+            case Surface.ROTATION_90:
+                degrees = 90;
+                break; // Landscape left
+            case Surface.ROTATION_180:
+                degrees = 180;
+                break;// Upside down
+            case Surface.ROTATION_270:
+                degrees = 270;
+                break;// Landscape right
+        }
+
+        int displayRotation = (cameraRotationOffset - degrees + 360) % 360;
+
+        Log.d(TAG, "rotation cam / phone = displayRotation: " + cameraRotationOffset + " / " + degrees + " = "
+                + displayRotation);
+        cameraManager.setCameraOrientation(displayRotation);
 
         cameraManager.setPreviewFrameSize(width, height);
 

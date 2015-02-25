@@ -18,6 +18,7 @@ package com.google.zxing.client.android.camera;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.graphics.Point;
 import android.hardware.Camera;
 import android.preference.PreferenceManager;
@@ -58,7 +59,7 @@ final class CameraConfigurationManager {
     Log.i(TAG, "Camera resolution: " + cameraResolution);
   }
 
-  void setDesiredCameraParameters(Camera camera, boolean safeMode) {
+  void setDesiredCameraParameters(Camera camera, boolean safeMode, int orientation) {
     Camera.Parameters parameters = camera.getParameters();
 
     if (parameters == null) {

@@ -98,11 +98,7 @@ public final class CameraManager {
         Camera theCamera = camera;
         if (theCamera == null) {
 
-            if (requestedCameraId >= 0) {
-                theCamera = OpenCameraInterface.open(requestedCameraId);
-            } else {
-                theCamera = OpenCameraInterface.open();
-            }
+            theCamera = OpenCameraInterface.open(getCameraId());
 
             if (theCamera == null) {
                 throw new IOException();
@@ -124,7 +120,7 @@ public final class CameraManager {
         Camera.Parameters parameters = theCamera.getParameters();
         String parametersFlattened = parameters == null ? null : parameters.flatten(); // Save these, temporarily
         try {
-            configManager.setDesiredCameraParameters(theCamera, false);
+            configManager.setDesiredCameraParameters(theCamera, false, getCurrentOrientation());
         } catch (RuntimeException re) {
             // Driver failed
             Log.w(TAG, "Camera rejected parameters. Setting only minimal safe-mode parameters");
@@ -135,7 +131,7 @@ public final class CameraManager {
                 parameters.unflatten(parametersFlattened);
                 try {
                     theCamera.setParameters(parameters);
-                    configManager.setDesiredCameraParameters(theCamera, true);
+                    configManager.setDesiredCameraParameters(theCamera, true, getCurrentOrientation());
                 } catch (RuntimeException re2) {
                     // Well, darn. Give up
                     Log.w(TAG, "Camera rejected even safe-mode parameters! No configuration");
@@ -222,6 +218,41 @@ public final class CameraManager {
             return camera.getParameters();
         } else {
             return null;
+        }
+    }
+
+    public synchronized Camera.CameraInfo getCameraInfo() {
+        if(camera != null && requestedCameraId >= 0) {
+            Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
+            Camera.getCameraInfo(requestedCameraId, cameraInfo);
+            return cameraInfo;
+        }
+
+        return null;
+    }
+
+    public synchronized int getCameraId() {
+        if(requestedCameraId >= 0) {
+            return requestedCameraId;
+        } else {
+            int numCameras = Camera.getNumberOfCameras();
+            if (numCameras == 0) {
+                Log.w(TAG, "No cameras!");
+                return -1;
+            }
+
+            // Select a camera if no explicit camera requested
+            int index = 0;
+            while (index < numCameras) {
+                Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
+                Camera.getCameraInfo(index, cameraInfo);
+                if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
+                    break;
+                }
+                index++;
+            }
+
+            return index;
         }
     }
 
